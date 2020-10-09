@@ -84,22 +84,22 @@ export function Controller() {
         "services": [0xfd6f]
       }]
     };
-    await bluetooth.requestDevice(options)
-      .then(device => {
-        connection = device;
-        connection.addEventListener('gattserverdisconnected', () => {
-          pubsub.emit('disconnected');
-        });
-      })
-      .then(() => connection.gatt.connect())
-      .catch(e => {throw e});
-    pubsub.emit('connected', connection);
+
+    connection = await bluetooth.requestDevice(options);
+    connection.addEventListener('gattserverdisconnected', () => {
+      pubsub.emit('disconnected');
+    });
+    await connection.gatt.connect();
+    pubsub.emit('connected', connection)
   }
 
   async function disconnect() {
     if (!connection) { return; }
-    await connection.gatt.disconnect();
-    connection = undefined;
+    try {
+      await connection.gatt.disconnect();
+    } finally {
+      connection = undefined;
+    }
   }
 
   function getCountStatus() {

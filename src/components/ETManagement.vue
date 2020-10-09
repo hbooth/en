@@ -102,6 +102,10 @@ export default {
         },
         onConnect: function() {
             this.controller.connect()
+                .catch(error => {
+                console.log('error name' + error.name);
+                console.log(error);
+            })
         },
         generateFilename: function () {
             var d = new Date();

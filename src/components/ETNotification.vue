@@ -58,18 +58,12 @@ export default {
         };
     },
     created() {
-        this.controller.on('connected', () => {
-            this.controller.getVersion()
-                .then(version => console.log(version))
-                .then(() => {this.connected = true});
-        })
-        this.controller.on('disconnected', () => {
-            this.connected = false
-        })
+        this.controller.on('connected', this.onConnected);
+        this.controller.on('disconnected', this.onDisconnected)
     },
     beforeDestroy() {
-        this.controller.off('disconnected')
-        this.controller.off('connected')
+        this.controller.off('disconnected', this.onDisconnected)
+        this.controller.off('connected', this.onConnected)
     },
     methods: {
         onUpload: function() {
@@ -123,6 +117,19 @@ export default {
         },
         onConnect: function() {
             this.controller.connect()
+            .catch(error => {
+                if (error.name !== 'NotFoundError') {
+                    console.log(error);
+                }
+            })
+        },
+        onConnected: function() {
+            this.controller.getVersion()
+                .then(version => console.log(version))
+                .then(() => {this.connected = true});
+        },
+        onDisconnected: function() {
+            this.connected = false;
         }
     }
 }
