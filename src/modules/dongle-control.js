@@ -120,6 +120,13 @@ export function Controller() {
       .then(value => value.getUint8(0));
   }
 
+  async function getLastAddress() {
+    assertConnection();
+    return await readData(COMMANDS.getLastAddress, (value, resolve) => {
+      resolve(value.getUint32(0, true));
+    });
+  }
+
   async function getVersion() {
     assertConnection();
     return await readData(COMMANDS.getVersion, (value, resolve) => {
@@ -234,7 +241,7 @@ export function Controller() {
   });
   }
 
-  async function fetchData(opts = { interrupt: false, onProgress: undefined }) {
+  async function fetchData(all = true, opts = { interrupt: false, onProgress: undefined}) {
     const blocksTotal = (await getCountStatus()).blocks;
     const blockSize = 32;
     const expectedLength = blocksTotal * blockSize;
@@ -296,7 +303,11 @@ export function Controller() {
     }
     await startDataNotifications(notify);
     try {
-      await writeCommand('Z');
+      if (all) {
+        await writeCommand('Z');
+      } else {
+        await writeCommand('G');
+      }
       await writeCommand(COMMANDS.startDataDownload.value);
       while (bytesReceived < expectedLength) {
         if (opts.interrupt){
@@ -329,6 +340,7 @@ export function Controller() {
     getVersion,
     synchClock,
     getBatteryLevel,
+    getLastAddress,
     startRecording: () => writeCommand(COMMANDS.startWritingToFlash.value),
     stopRecording: () => writeCommand(COMMANDS.stopWritingToFlash.value),
     setMark: () => writeCommand(COMMANDS.recordPrimaryEncounterEvent.value),
