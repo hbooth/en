@@ -1,6 +1,10 @@
 var ss = require('./struct-schema')
 
-const BLOCK_SIZE = 32 // bytes
+const recordSize = 64;
+const headerSize = 96;
+// set-up header sentinel
+const zeros = Buffer.alloc(32);
+zeros.fill(0);
 
 const uSound = new ss.StructSchema([
   {
@@ -127,8 +131,21 @@ function getDataFromView(arrayView) {
   }
 }
 
+function compareBytes(buf1, offset1, buf2, offset2, length) {
+  let cursor1 = offset1, cursor2 = offset2
+  for (var i = 0; i < length; i++) {
+    if (cursor1 >= buf1.byteLength ||
+      cursor2 >= buf2.byteLength ||
+      buf1[cursor1] !== buf2[cursor2]) {
+      return false;
+    }
+    cursor1++
+    cursor2++
+  }
+  return true;
+}
+
 function bytesToData(raw){
-  const numBlocks = raw.byteLength / BLOCK_SIZE
   // let last_mark = 0
   // console.log('numBlocks: '+numBlocks);
   // for (let index = 0; index < numBlocks; index++) {
@@ -140,15 +157,18 @@ function bytesToData(raw){
   // }
 
   // let last_start = last_mark + 2
-  let last_start = 0 
   let data = []
-
-  for (let index = last_start; index < numBlocks - 1; index += 2) {
-    let row = new DataView(raw.buffer, index * BLOCK_SIZE, 2 * BLOCK_SIZE)
-    let entry = getDataFromView(row)
-    data.push(entry)
+  let cursor = 0
+  while ((cursor + recordSize) < raw.byteLength) {
+    if (compareBytes(raw.buffer, cursor, zeros, 0, zeros.length)) {
+      cursor += headerSize
+    } else {
+      let row = new DataView(raw.buffer, cursor, recordSize)
+      let entry = getDataFromView(row)
+      data.push(entry)
+      cursor += recordSize
+    }
   }
-
   return data
 }
 
