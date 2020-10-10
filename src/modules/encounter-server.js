@@ -1,19 +1,30 @@
-const http = require('http')
+import http from 'http'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+
+dayjs.extend(utc)
 
 // need to send each request and wait to avoid overloading the server
-async function postEncounters(host, port, rows, status) {
+async function postEncounters(host, port, rows, status = 'NONE', batchSize = 50) {
     var added = 0;
-    for (var entry of rows) {
-        let submission = { encounters: [{
-            status: status,
-            encounterId: entry.encounterId,
-            timestamp: entry.timestamp,
-            _meta: {
-                mac: entry.mac,
-                rssi_values: entry.rssi_values,
-                usound_data: entry.usound_data
-            }
-        }]};
+    var processed = 0;
+    while (processed < rows.length) {
+        let submission = { encounters: [] };
+        // process batchSize at a time
+        for (; processed < rows.length && submission.encounters < batchSize; processed++) {
+            var entry = rows[processed];
+            submission.encounters.push({
+                status: status,
+                encounterId: entry.encounterId,
+                timestamp: entry.timestamp,
+                _meta: {
+                    mac: entry.mac,
+                    rssi_values: entry.rssi_values,
+                    usound_data: entry.usound_data
+                }
+            });
+        }
+        // now send off to the server
         let data = JSON.stringify(submission);
         const options = {
             hostname: host,
@@ -30,7 +41,7 @@ async function postEncounters(host, port, rows, status) {
             let http_promise = createHttpRequestPromise(options, data);
             // wait to http request to finish
             await http_promise;
-            added = added + 1;
+            added = added + submission.encounters.length;
         } catch(error) {
             console.log(`error while sending data: ${data}`);
             console.log(error);
@@ -42,11 +53,13 @@ async function postEncounters(host, port, rows, status) {
 async function getEncounters(host, port) {
     var currentPage = 0, totalPages = 1;
     var result = [];
+    // cutoff for the last two weeks
+    let cutoff = dayjs().subtract(2, 'week').utc().format();
     while (currentPage < totalPages) {
         const options = {
             hostname: host,
             port: port,
-            path: '/api/encounters/debug?page=' + currentPage,
+            path: '/api/encounters/debug?page=' + currentPage + '&status=POSITIVE&timestamp[$gte]=' + cutoff,
             method: 'GET',
             headers: { 'Access-Control-Allow-Headers': 'X-Pages', 'Access-Control-Expose-Headers': 'X-Pages'}
         };
