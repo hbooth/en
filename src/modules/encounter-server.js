@@ -11,7 +11,7 @@ async function postEncounters(host, port, rows, status = 'NONE', batchSize = 50)
     while (processed < rows.length) {
         let submission = { encounters: [] };
         // process batchSize at a time
-        for (; processed < rows.length && submission.encounters < batchSize; processed++) {
+        for (; processed < rows.length && submission.encounters.length < batchSize; processed++) {
             var entry = rows[processed];
             submission.encounters.push({
                 status: status,
@@ -36,7 +36,6 @@ async function postEncounters(host, port, rows, status = 'NONE', batchSize = 50)
             'Content-Length': data.length
             }
         };
-
         try {
             let http_promise = createHttpRequestPromise(options, data);
             // wait to http request to finish
