@@ -70,5 +70,9 @@ export const COMMANDS = Object.freeze({
     getVersion: {
       value: 'v',
       returnType: Uint8Array
+    },
+    getLastAddress: {
+      value: 'g',
+      returnType: Uint32Array
     }
 })
