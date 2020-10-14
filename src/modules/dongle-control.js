@@ -241,8 +241,8 @@ export function Controller() {
   });
   }
 
-  async function fetchData(all = true, opts = { interrupt: false, onProgress: undefined}) {
-    const blocksTotal = (await getCountStatus()).blocks;
+  async function fetchData(all = true, updateLastAddress = false, opts = { interrupt: false, onProgress: undefined}) {
+    const blocksTotal = all ? (await getCountStatus()).blocks : (await getCountStatus()).blocks - (await getLastAddress()) << 32;
     const blockSize = 32;
     const expectedLength = blocksTotal * blockSize;
 
@@ -296,7 +296,7 @@ export function Controller() {
         };
         index_view.setUint32(0, index, true);
         connection.gatt.getPrimaryService(SERVICE_UUID)
-          .then(service => service.getCharacteristic(CHARACTERISTICS.data_req))
+          .then(service => service.getCharacteristic(CHARACTERISTICS.data))
           .then(characteristic => characteristic.writeValue(index_view))
           .catch(err => reject(err));
       });
@@ -324,6 +324,11 @@ export function Controller() {
       } finally {
         await writeCommand(COMMANDS.stopDataDownload.value);
       }
+    }
+    // update the last address
+    if (updateLastAddress) {
+      console.log('sending Y command')
+      await writeCommand(COMMANDS.markLastAddress.value);
     }
     return result;
   }

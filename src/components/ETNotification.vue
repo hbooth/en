@@ -68,9 +68,13 @@ export default {
     methods: {
         onUpload: function() {
             this.upload_message = "Retrieving Device Data";
-            this.controller.fetchData()
-                .then(data => {
+            this.controller.getLastAddress()
+                .then(address => {
+                    console.log('lastAddress: ' + address)
                     // retrieve the data from the device
+                    return this.controller.fetchData(false, true);
+                }).then(data => {
+                    // now transform into encounter records
                     return bytesToData(data);
                 })
                 .then(rows => {

@@ -1,10 +1,8 @@
 var ss = require('./struct-schema')
 
 const recordSize = 64;
-const headerSize = 96;
-// set-up header sentinel
-const zeros = Buffer.alloc(32);
-zeros.fill(0);
+const blockSize = 32;
+
 
 const uSound = new ss.StructSchema([
   {
@@ -131,6 +129,7 @@ function getDataFromView(arrayView) {
   }
 }
 
+/*
 function compareBytes(buf1, offset1, buf2, offset2, length) {
   let cursor1 = offset1, cursor2 = offset2
   for (var i = 0; i < length; i++) {
@@ -144,24 +143,25 @@ function compareBytes(buf1, offset1, buf2, offset2, length) {
   }
   return true;
 }
+*/
+
+function isSameValue(buffer, start, end) {
+  var nibble = buffer[start];
+  for (var i = start; i < end; i++) {
+    if (nibble !== buffer[i]) {
+      return false;
+    }
+  }
+  return true;
+}
 
 function bytesToData(raw){
-  // let last_mark = 0
-  // console.log('numBlocks: '+numBlocks);
-  // for (let index = 0; index < numBlocks; index++) {
-  //   let view = new Uint32Array(raw.buffer, index * BLOCK_SIZE, BLOCK_SIZE / 4)
-
-  //   if (view.every(isZero)) {
-  //     last_mark = index
-  //   }
-  // }
-
-  // let last_start = last_mark + 2
   let data = []
   let cursor = 0
   while ((cursor + recordSize) < raw.byteLength) {
-    if (compareBytes(raw.buffer, cursor, zeros, 0, zeros.length)) {
-      cursor += headerSize
+    // check for blocks of all the same value and filter them out
+    if (isSameValue(raw, cursor, cursor + blockSize)) {
+      cursor += blockSize
     } else {
       let row = new DataView(raw.buffer, cursor, recordSize)
       let entry = getDataFromView(row)
