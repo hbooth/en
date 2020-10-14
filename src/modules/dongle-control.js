@@ -213,7 +213,9 @@ export function Controller() {
 
    async function synchClock() {
     let epoch_time = (new Date()).getTime();
-    let uptime = await getUptime();
+    let uptime = await readData(COMMANDS.getUptime, (value, resolve) => {
+      resolve([value.getUint32(0, true), value.getUint32(4, true)]);
+    });
     let buffer = new ArrayBuffer(12);
 		let view = new DataView(buffer);
     view.setUint32(0, parseInt(epoch_time / 1000), true);
@@ -224,11 +226,11 @@ export function Controller() {
   }
 
   async function getUptime() {
-    return await readData(COMMANDS.getUptime, (value, resolve) => {
-        // value is time since reboot - in ms
-        var little = value.getUint32(0, true);
-        var big = value.getUint32(4, true);
-        resolve(little + (big << 17));
+    return readData(COMMANDS.getUptime, (value, resolve) => {
+      // value is time since reboot - in ms
+      var little = value.getUint32(0, true);
+      var big = value.getUint32(4, true);
+      resolve(little + (big << 17));
     });
   }
 
