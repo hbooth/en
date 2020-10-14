@@ -83,7 +83,8 @@ export default {
                         return v.encounterId !== '0000000000000000000000000000000000000000000000000000000000000000';
                     });
                     // send the data to the server
-                    return postEncounters('localhost', '8000', rows, 'POSITIVE');
+                    return postEncounters('localhost', '8000', rows, 'POSITIVE',
+                        { name: this.controller.getDeviceName() });
                 })
                 .then((result) => {
                     this.upload_message = "Data Upload Complete - Added " + result;

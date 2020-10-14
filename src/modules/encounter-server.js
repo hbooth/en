@@ -5,7 +5,7 @@ import utc from 'dayjs/plugin/utc'
 dayjs.extend(utc)
 
 // need to send each request and wait to avoid overloading the server
-async function postEncounters(host, port, rows, status = 'NONE', batchSize = 50) {
+async function postEncounters(host, port, rows, status = 'NONE', meta = {}, batchSize = 50) {
     var added = 0;
     var processed = 0;
     while (processed < rows.length) {
@@ -20,7 +20,8 @@ async function postEncounters(host, port, rows, status = 'NONE', batchSize = 50)
                 _meta: {
                     mac: entry.mac,
                     rssi_values: entry.rssi_values,
-                    usound_data: entry.usound_data
+                    usound_data: entry.usound_data,
+                    ...meta
                 }
             });
         }
