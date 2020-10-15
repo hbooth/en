@@ -35,7 +35,7 @@ function toHexString (byteArray) {
           chars[p++] = space;
       }
   }
-  return String.fromCharCode.apply(null, chars);
+  return new TextDecoder("utf-8").decode(chars);
 }
 
 function download(filecontent, filename) {
