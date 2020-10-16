@@ -312,8 +312,8 @@ export function Controller() {
       }
       await writeCommand(COMMANDS.startDataDownload.value);
       while (bytesReceived < expectedLength) {
-        if (opts.interrupt){
-          throw new InterruptException()
+        if (opts.interrupt) {
+          throw new InterruptException();
         }
         await nextBlock();
         if (opts.onProgress) {
@@ -322,14 +322,13 @@ export function Controller() {
       }
     } finally {
       try {
-        await stopDataNotifications(notify);
-      } finally {
         await writeCommand(COMMANDS.stopDataDownload.value);
+      } finally {
+        await stopDataNotifications(notify);
       }
     }
     // update the last address
     if (updateLastAddress) {
-      console.log('sending Y command')
       await writeCommand(COMMANDS.markLastAddress.value);
     }
     return result;

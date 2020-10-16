@@ -3,19 +3,19 @@
     <caption v-if="caption">{{ caption }}</caption>
     <thead>
         <tr>
-        <th v-for="(key, index) in columns"
+        <th v-for="(header, index) in headers"
             @click="sortBy(key)"
-            :class="{ active: sortKey == key }"
+            :class="{ active: sortKey == header.name }"
             :key="index">
-            {{ key | capitalize }}
-            <span class="arrow" :class="sortOrders[key] > 0 ? 'asc' : 'dsc'">
+            {{ header.title | capitalize }}
+            <span class="arrow" :class="sortOrders[header.name] > 0 ? 'asc' : 'dsc'">
             </span>
         </th>
         </tr>
     </thead>
     <tbody>
         <tr v-for="(entry, row) in filteredData" :key="row">
-            <td v-for="(key, col) in columns" :key="col">{{entry[key]}}</td>
+            <td v-for="(header, col) in headers" :key="col">{{ entry[header.name] | formatEntry(header.filter, $options.filters) }}</td>
         </tr>
     </tbody>
     </table>
@@ -25,12 +25,25 @@
 export default {
     data() {
         var sortOrders = {};
-        this.columns.forEach(function(key) {
-            sortOrders[key] = 1;
+        var headers = [];
+        for (var h of this.columns) {
+            if (typeof h == 'string' || h instanceof String) {
+                headers.push({name: h, title: h});
+            } else {
+                var value = h;
+                if (!value.title && value.name) {
+                    value = {title: value.name, ...value};
+                }
+                headers.push(value);
+            }
+        }
+        headers.forEach(function(h) {
+            sortOrders[h.name] = 1;
         });
         return {
             sortKey: "",
-            sortOrders: sortOrders
+            sortOrders,
+            headers
         };
     },
     props: {
@@ -69,6 +82,15 @@ export default {
     filters: {
         capitalize: function(str) {
             return str.charAt(0).toUpperCase() + str.slice(1);
+        },
+        formatEntry: function(value, filter, filters) {
+            if (filter) {
+                var func = filters[filter];
+                if (func) {
+                    return func(value)
+                }
+            }
+            return value;
         }
     },
     methods: {

@@ -1,13 +1,14 @@
 <template>
 <div class="management-tab">
 <device-info :device="controller" :connected="connected" v-if="connected" allowSynch></device-info>
-<simple-grid :data="gridData" :columns="gridColumns" :caption="'Properties'" v-if="connected"></simple-grid>
+<progress-status ref="progress"></progress-status>
+<button id="cancel" v-if="fetch" v-on:click="onCancel">Cancel</button>
 <div class="memory" v-if="connected">
     <h3>Memory:</h3>
-    <a href="#" v-on:click="onLoad">Load</a>
+    <a href="#" v-on:click="onLoad" :disabled="fetch">Load</a>
     <textarea rows="10" cols="60" readonly="1" wrap="1" v-model="hexMemory"></textarea>
-    <button id="download" v-on:click="onDownload">Download</button>
-    <button id="erase" v-on:click="onErase">Erase</button>
+    <button id="download" :disabled="fetch" v-on:click="onDownload">Download</button>
+    <button id="erase" :disabled="fetch" v-on:click="onErase">Erase</button>
 </div>
 <button id="connect" v-on:click="onConnect" v-else>Connect</button>
 </div>
@@ -15,8 +16,8 @@
 
 <script>
 import DeviceInfo from './DeviceInfo'
-import SimpleGrid from './SimpleGrid'
-import { Controller }  from '../modules/dongle-control'
+import ProgressStatus from './ProgressStatus'
+import { Controller, InterruptException }  from '../modules/dongle-control'
 
 function toHexString (byteArray) {
   const length = byteArray.length * 2;
@@ -50,19 +51,14 @@ function download(filecontent, filename) {
 }
 
 export default {
-    components: { DeviceInfo, SimpleGrid },
+    components: { DeviceInfo, ProgressStatus},
     data() {
         return {
             controller: Controller(),
             connected: false,
-            gridColumns: ["name", "value"],
-            gridData: [
-                { name: "attribute1", value: 'Value1' },
-                { name: "attribute2", value: 'Value2' },
-                { name: "attribute3", value: 'Value3' },
-                { name: "attribute4", value: 'Value4' }
-            ],
-            memory: undefined
+            memory: undefined,
+            fetch: false,
+            callbackOptions: { first: true, interrupt: false, onProgress: this.onProgress}
         };
     },
     created() {
@@ -73,6 +69,8 @@ export default {
         this.controller.on('disconnected', () => {
             this.connected = false
             this.memory = undefined
+            this.fetch = false
+            this.$refs.progress.clear()
         })
     },
     beforeDestroy() {
@@ -80,20 +78,51 @@ export default {
         this.controller.off('connected')
     },
     methods: {
-        onLoad: function() {
-            this.controller.fetchData()
+        fetchData: function() {
+            // set-up the callback
+            this.callbackOptions.first = true;
+            this.callbackOptions.interrupt = false;
+            this.fetch = true;
+
+            this.$refs.progress.taskBegin(1, "Fetching Data...");
+            return this.controller.fetchData(true, false, this.callbackOptions)
                 .then(data => {
-                    this.memory = data;
-                });
+                    this.$refs.progress.taskEnd("Completed");
+                    return data;
+                })
+                .catch(error => {
+                    if (error instanceof InterruptException) {
+                        this.$refs.progress.taskCancel("Upload Cancelled");
+                    } else {
+                        this.$refs.progress.taskError("Error during Upload");
+                        console.log(error);
+                    }
+                    return undefined;
+                })
+                .then(() => {
+                    this.fetch = false;
+                    this.$refs.progress.taskReset();
+                    return undefined;
+                });            
+        },
+        onLoad: function() {
+            if (!this.fetch) {
+                this.fetchData().then(data => { this.memory = data });
+            }
         },
         onErase: function() {
-            this.controller.eraseData().then(() => this.memory = undefined)
+            if (!this.fetch) {
+                this.controller.eraseData().then(() => this.memory = undefined)
+            }
         },
         onDownload: function() {
+            if (this.fetch) return;
             if (!this.memory) {
-                this.controller.fetchData()
+                this.fetchData()
                     .then(data => {
-                        download(data, this.generateFilename());
+                        if (data) {
+                            download(data, this.generateFilename());
+                        }
                     })
             }
             if (this.memory) {
@@ -102,10 +131,20 @@ export default {
         },
         onConnect: function() {
             this.controller.connect()
-                .catch(error => {
-                console.log('error name' + error.name);
-                console.log(error);
+            .catch(error => {
+                if (error.name !== 'NotFoundError') {
+                    console.log(error);
+                }
             })
+        },
+        onProgress: function(received, expected) {
+            if (this.callbackOptions.first) {
+                this.$refs.progress.taskExtend(expected);
+            }
+            this.$refs.progress.taskNextStep(undefined, received);
+        },
+        onCancel: function() {
+            this.callbackOptions.interrupt = true;
         },
         generateFilename: function () {
             var d = new Date();

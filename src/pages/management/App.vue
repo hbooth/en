@@ -17,16 +17,15 @@
 
 <script>
       import tabTracking from "../../components/ETTracking";
-      import tabProcessing from "../../components/ETProcessing"
       import tabManagement from "../../components/ETManagement";
 
       export default {
         name: "NISTET",
-        components: {tabTracking, tabProcessing, tabManagement},
+        components: {tabTracking, tabManagement},
         data: function() {
           return {
           currentTab: "Tracking",
-          tabs: ["Tracking", "Processing", "Management"]
+          tabs: ["Tracking", "Management"]
           };
         },
         computed: {

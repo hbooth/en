@@ -1,13 +1,13 @@
 <template >
 <div class="notification-tab">
 <device-info :device="controller" :connected="connected" v-if="connected"></device-info>
-<simple-grid :data="gridData" :columns="gridColumns" :caption="'Recent Encounters'" v-if="connected && gridData.length > 0"></simple-grid>
-<p v-if="connected && gridData.length == 0">{{ empty_message }}</p>
 <div v-if="connected">
-    <button id="upload" v-on:click="onUpload">Upload</button>
-    <button id="encounter" v-on:click="onEncounters">Encounters</button>
+    <progress-status ref="progress"></progress-status>
+    <button v-if="state !== 'default'" v-on:click="onCancel">Cancel</button>
+    <button v-if="state === 'default'" v-on:click="onUpload">Upload</button>
+    <button v-if="state === 'default'" v-on:click="onExposures">Check Exposures</button>
 </div>
-<p v-if="connected && upload_message">{{ upload_message }}</p>
+<simple-grid :data="gridData" :columns="gridColumns" :caption="'Exposures'" v-if="connected && gridData.length > 0"></simple-grid>
 <button id="connect" v-on:click="onConnect" v-if="!connected">Connect</button>
 </div>
 </template>
@@ -15,18 +15,26 @@
 <script>
 import DeviceInfo from './DeviceInfo'
 import SimpleGrid from './SimpleGrid'
-import { Controller }  from '../modules/dongle-control'
+import ProgressStatus from './ProgressStatus'
+import { Controller, InterruptException }  from '../modules/dongle-control'
 import { bytesToData } from '../modules/bytes-to-csv'
 import { postEncounters, getEncounters } from '../modules/encounter-server'
 
+import dayjs from 'dayjs'
+import duration from 'dayjs/plugin/duration'
+
+dayjs.extend(duration)
+
 function compare(local, exposures) {
-    let result = [];
+    let groups = [];
     if (exposures.length > 0) {
         let map = {};
         let match = {};
         for (var e of exposures) {
             map[e.encounterId] = e;
         }
+        var matches = [];
+        // now look for matches
         for (var l of local) {
             // use encounter id
             if (map[l.encounterId]) {
@@ -36,88 +44,154 @@ function compare(local, exposures) {
                         match[l.encounterId] = {};
                     }
                     match[l.encounterId][l.timestamp] = 1;
-                    result.push(l);
+                    matches.push(l);
                     continue;
                 }
             }
         }
+        // now group
+        var lastGroup = undefined;
+        for (var m of matches) {
+            var time = dayjs(m.timestamp);
+            var newGroup = !lastGroup;
+            if (!newGroup) {
+                var cutoff = lastGroup.start.add(5 + lastGroup.duration, 'minutes');
+                newGroup = time.isAfter(cutoff);
+            }
+            if (newGroup) {
+                lastGroup = { start: time, duration: 1, count: 1};
+                groups.push(lastGroup);
+            } else {
+                // add to the current group
+                lastGroup.duration = time.diff(lastGroup.start, 'minute');
+                lastGroup.count += 1;
+            }
+        }
     }
-    return result;
+    return groups;
 }
 
 export default {
-    components: { DeviceInfo, SimpleGrid },
+    components: { DeviceInfo, SimpleGrid, ProgressStatus},
     data() {
         return {
             controller: Controller(),
             connected: false,
-            gridColumns: ["encounterId", "timestamp", "mac"],
+            gridColumns: [ {title:"Start Time", name: 'start', filter: 'formatMoment'},
+                {title: "Duration (minutes)", name: 'duration'},
+                {title: "Count", name: 'count'}],
             gridData: [],
-            empty_message: "Not Checked",
-            upload_message: undefined
+            state: 'default',
+            callbackOptions: { first: true, interrupt: false, onProgress: this.onProgress},
         };
     },
     created() {
         this.controller.on('connected', this.onConnected);
-        this.controller.on('disconnected', this.onDisconnected)
+        this.controller.on('disconnected', this.onDisconnected);
     },
     beforeDestroy() {
         this.controller.off('disconnected', this.onDisconnected)
         this.controller.off('connected', this.onConnected)
     },
     methods: {
-        onUpload: function() {
-            this.upload_message = "Retrieving Device Data";
+        onProgress: function(received, expected) {
+            if (this.callbackOptions.first) {
+                this.$refs.progress.taskExtend(expected);
+            }
+            this.$refs.progress.taskNextStep(undefined, received);
+        },
+        onUpload: async function() {
+            var progress = this.$refs.progress;
+            this.state = 'upload';
+
+            // set-up the callback
+            this.callbackOptions.first = true;
+            this.callbackOptions.interrupt = false;
+
+            progress.taskBegin(4, "Retrieving Device Data");
             this.controller.getLastAddress()
                 .then(address => {
-                    console.log('lastAddress: ' + address)
+                    // check the last address and print it out
+                    console.log('lastAddress: ' + address);
+                    progress.taskNextStep();
+                })
+                .then(() => {
                     // retrieve the data from the device
-                    return this.controller.fetchData(false, true);
-                }).then(data => {
+                    return this.controller.fetchData(false, false, this.callbackOptions);
+                })
+                .then(data => {
+                    progress.taskNextStep("Processing Data...");
                     // now transform into encounter records
                     return bytesToData(data);
                 })
                 .then(rows => {
-                    this.upload_message = "Processing Data";
                     rows = rows.filter(v => {
                         return v.encounterId !== '0000000000000000000000000000000000000000000000000000000000000000';
                     });
+                    progress.taskNextStep("Uploading...");
                     // send the data to the server
                     return postEncounters('localhost', '8000', rows, 'POSITIVE',
                         { name: this.controller.getDeviceName() });
                 })
-                .then((result) => {
-                    this.upload_message = "Data Upload Complete - Added " + result;
+                .then(result => {
+                    progress.taskEnd("Data Upload Complete - Added " + result);
                 })
                 .catch(error => {
-                    this.upload_message = "Error during Upload";
-                    console.log(error)
+                    if (error instanceof InterruptException) {
+                        progress.taskCancel("Upload Cancelled");
+                    } else {
+                        progress.taskError("Error during Upload");
+                        console.log(error);
+                    }
+                })
+                .then(() => {
+                    progress.taskReset();
+                    this.state = 'default';
                 });
         },
-        onEncounters: function() {
+        onCancel: function() {
+            this.callbackOptions.interrupt = true;
+        },
+        onExposures: function() {
+            var progress = this.$refs.progress;
+            this.state = 'exposures';
+            // set-up the callback
+            this.callbackOptions.first = true;
+            this.callbackOptions.interrupt = false;
+
             let storage = {};
             this.gridData = [];
-            this.empty_message = "Retrieving Device Data";
+            progress.taskBegin(4, "Retrieving Device Data");
             // first retrieve the data from the device
-            this.controller.fetchData()
+            this.controller.fetchData(true, false, this.callbackOptions)
                 .then(data => {
+                    progress.taskNextStep("Device Data Retrieved");
                     // retrieve the data from the device
                     return bytesToData(data);
                 })
                 .then(local => {
-                    this.empty_message = "Retrieving Server Data";
+                    progress.taskNextStep("Retrieving Server Data");
                     storage.local = local;
                     // then retrieve the data from the server
                     return getEncounters('localhost', '8000');
                 })
                 .then(data => {
-                    this.empty_message = "Comparing";
+                    progress.taskNextStep("Comparing");
                     // then compare
                     this.gridData = compare(storage.local, data);
-                    this.empty_message = "No Encounters Found";
-                }).catch(error => {
-                    console.log(error);
-                    this.empty_message = "Error While Looking for Encounters";
+                    progress.taskEnd(this.gridData.length > 0 ? "Complete" : "No Encounters Found");
+                })
+                .catch(error => {
+                    if (error instanceof InterruptException) {
+                        progress.taskCancel("Check Cancelled");
+                    } else {
+                        progress.taskError("Error While Looking for Encounters");
+                        console.log(error);
+                    }
+                })
+                .then(() => {
+                    progress.taskReset();
+                    this.state = 'default';
                 });
         },
         onConnect: function() {
@@ -143,6 +217,6 @@ export default {
 
 <style scoped>
 button {
-    margin-right: 0.25em;
+  margin-right: 0.25em;
 }
 </style>
