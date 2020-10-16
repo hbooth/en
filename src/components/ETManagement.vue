@@ -1,8 +1,9 @@
 <template>
 <div class="management-tab">
 <device-info :device="controller" :connected="connected" v-if="connected" allowSynch></device-info>
-<progress-status ref="progress"></progress-status>
-<button id="cancel" v-if="fetch" v-on:click="onCancel">Cancel</button>
+<p v-if="connected">Firmware Version: {{ version }}</p>
+<progress-status v-if="connected" ref="progress"></progress-status>
+<button id="cancel" v-if="connected && fetch" v-on:click="onCancel">Cancel</button>
 <div class="memory" v-if="connected">
     <h3>Memory:</h3>
     <a href="#" v-on:click="onLoad" :disabled="fetch">Load</a>
@@ -58,17 +59,27 @@ export default {
             connected: false,
             memory: undefined,
             fetch: false,
-            callbackOptions: { first: true, interrupt: false, onProgress: this.onProgress}
+            version: undefined,
+            callbackOptions: { expected: undefined, last: 0, interrupt: false, onProgress: this.onProgress}
         };
     },
     created() {
         this.controller.on('connected', () => {
-            this.connected = true
-            this.memory = undefined
+            this.controller.getVersion()
+                .then(version => this.version = version)
+                .then(() => {
+                    this.connected = true
+                    this.memory = undefined
+                })
+                .catch(error => {
+                    console.log("version error")
+                    console.log(error);
+                });
         })
         this.controller.on('disconnected', () => {
             this.connected = false
             this.memory = undefined
+            this.version = undefined
             this.fetch = false
             this.$refs.progress.clear()
         })
@@ -80,8 +91,8 @@ export default {
     methods: {
         fetchData: function() {
             // set-up the callback
-            this.callbackOptions.first = true;
-            this.callbackOptions.interrupt = false;
+            this.callbackOptions.expected = undefined;
+            this.callbackOptions.last = 0;
             this.fetch = true;
 
             this.$refs.progress.taskBegin(1, "Fetching Data...");
@@ -99,15 +110,17 @@ export default {
                     }
                     return undefined;
                 })
-                .then(() => {
+                .then((result) => {
                     this.fetch = false;
                     this.$refs.progress.taskReset();
-                    return undefined;
-                });            
+                    return result;
+                });
         },
         onLoad: function() {
             if (!this.fetch) {
-                this.fetchData().then(data => { this.memory = data });
+                this.fetchData().then(data => {
+                    this.memory = data
+                });
             }
         },
         onErase: function() {
@@ -138,10 +151,12 @@ export default {
             })
         },
         onProgress: function(received, expected) {
-            if (this.callbackOptions.first) {
+            if (!this.callbackOptions.expected) {
+                this.callbackOptions.expected = expected
                 this.$refs.progress.taskExtend(expected);
             }
-            this.$refs.progress.taskNextStep(undefined, received);
+            this.$refs.progress.taskNextStep(undefined, received - this.callbackOptions.last);
+            this.callbackOptions.last = received;
         },
         onCancel: function() {
             this.callbackOptions.interrupt = true;

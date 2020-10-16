@@ -18,14 +18,15 @@
 <script>
       import tabTracking from "../../components/ETTracking";
       import tabManagement from "../../components/ETManagement";
+      import tabCalibration from "../../components/ETCalibration";
 
       export default {
         name: "NISTET",
-        components: {tabTracking, tabManagement},
+        components: {tabTracking, tabManagement, tabCalibration},
         data: function() {
           return {
           currentTab: "Tracking",
-          tabs: ["Tracking", "Management"]
+          tabs: ["Tracking", "Calibration", "Management"]
           };
         },
         computed: {
@@ -40,10 +41,24 @@
 </script>
 
 <style>
+body {
+  font-family: sans-serif;
+	font-size: 1.2rem;
+}
+
+button {
+		border: none;
+		padding: 0.25rem 1rem;
+		margin: 0 0.25rem;
+		border-radius: 10px;
+		text-decoration: none;
+		background: #800080;
+		color: #ffffff;
+}
+
 .tab-button {
   padding: 6px 10px;
-  border-top-left-radius: 3px;
-  border-top-right-radius: 3px;
+  border-radius: 10px 10px 0 0;
   border: 1px solid #ccc;
   cursor: pointer;
   background: #f0f0f0;
@@ -55,39 +70,11 @@
 }
 .tab-button.active {
   background: #e0e0e0;
+  color: #000000;
 }
 .tab {
   border: 1px solid #ccc;
   padding: 10px;
-}
-.posts-tab {
-  display: flex;
-}
-.posts-sidebar {
-  max-width: 40vw;
-  margin: 0;
-  padding: 0 10px 0 0;
-  list-style-type: none;
-  border-right: 1px solid #ccc;
-}
-.posts-sidebar li {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  cursor: pointer;
-}
-.posts-sidebar li:hover {
-  background: #eee;
-}
-.posts-sidebar li.selected {
-  background: lightblue;
-}
-.selected-post-container {
-  padding-left: 10px;
-}
-.selected-post > :first-child {
-  margin-top: 0;
-  padding-top: 0;
 }
 
 .round-button {

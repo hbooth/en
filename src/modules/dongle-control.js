@@ -5,6 +5,15 @@ import EventEmitter from 'events'
 //const COMMAND_TIMEOUT = 5000
 const noop = () => {}
 
+export const MODES = Object.freeze({
+  CALIBRATION: {
+    command: COMMANDS.setModeRaw.value,
+  },
+  ENCOUNTER: {
+    command: COMMANDS.setModeEncounter.value
+  }
+});
+
 function toBtValue(val) {
   if (typeof val === 'number') {
     let buf = new ArrayBuffer(4)
@@ -139,13 +148,7 @@ export function Controller() {
       .then(service => service.getCharacteristic(CHARACTERISTICS.data))
       .then(characteristic => characteristic.writeValue(data));
   }
-/*
-  function readData() {
-    return connection.gatt.getPrimaryService(SERVICE_UUID)
-      .then(service => service.getCharacteristic(CHARACTERISTICS.data))
-      .then(characteristic => characteristic.readValue());
-  }
-*/
+
   function startDataNotifications(listener) {
     return connection.gatt.getPrimaryService(SERVICE_UUID)
       .then(service => service.getCharacteristic(CHARACTERISTICS.data))
@@ -159,6 +162,23 @@ export function Controller() {
       .then(characteristic => characteristic.stopNotifications())
       .then(characteristic => characteristic.removeEventListener('characteristicvaluechanged', listener));
   }
+
+  async function getMode() {
+    assertConnection();
+    return await readData(COMMANDS.getMode, (value, resolve, reject) => {
+      switch(value.getUint8()) {
+        case 0:
+          resolve(MODES.CALIBRATION);
+          break;
+        case 1:
+          resolve(MODES.ENCOUNTER);
+          break;
+        default:
+          reject(value.getUint8());
+          break;
+      }
+    });
+	}
 
   async function readData(command, onData) {
     assertConnection();
@@ -200,6 +220,20 @@ export function Controller() {
     assertConnection();
     await writeData(str2ab(name))
       .then(() => writeCommand(COMMANDS.setName.value));
+  }
+
+	function writeCalibration(distance, orientation) {
+		console.log("writing calibration data");
+		let buffer = new ArrayBuffer(4);
+    let view = new DataView(buffer);
+  
+    view.setUint16(0, distance, true);
+    let orient = 0;
+    if (orientation !== 'baseline') {
+      orient = orientation.charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+    }
+    view.setUint16(2, orient, true);
+		return writeData(buffer);
   }
 
   function setScanParameters(interval, window) {
@@ -351,6 +385,9 @@ export function Controller() {
     stopRecording: () => writeCommand(COMMANDS.stopWritingToFlash.value),
     setMark: () => writeCommand(COMMANDS.recordPrimaryEncounterEvent.value),
     setUnmark: () => writeCommand(COMMANDS.recordSecondaryEncounterEvent.value),
+    setMode: (mode) => writeCommand(mode.command),
+    getMode,
+    writeCalibration,
     setScanParameters,
     getDeviceName: () => sanitize(connection.name),
     isConnected: () => !!connection,

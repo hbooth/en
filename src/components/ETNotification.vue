@@ -82,7 +82,7 @@ export default {
                 {title: "Count", name: 'count'}],
             gridData: [],
             state: 'default',
-            callbackOptions: { first: true, interrupt: false, onProgress: this.onProgress},
+            callbackOptions: { expected: undefined, last: 0, interrupt: false, onProgress: this.onProgress},
         };
     },
     created() {
@@ -95,17 +95,20 @@ export default {
     },
     methods: {
         onProgress: function(received, expected) {
-            if (this.callbackOptions.first) {
+            if (!this.callbackOptions.expected) {
+                this.callbackOptions.expected = expected
                 this.$refs.progress.taskExtend(expected);
             }
-            this.$refs.progress.taskNextStep(undefined, received);
+            this.$refs.progress.taskNextStep(undefined, received - this.callbackOptions.last);
+            this.callbackOptions.last = received;
         },
         onUpload: async function() {
             var progress = this.$refs.progress;
             this.state = 'upload';
 
             // set-up the callback
-            this.callbackOptions.first = true;
+            this.callbackOptions.expected = undefined;
+            this.callbackOptions.last = 0;
             this.callbackOptions.interrupt = false;
 
             progress.taskBegin(4, "Retrieving Device Data");
@@ -156,8 +159,8 @@ export default {
             var progress = this.$refs.progress;
             this.state = 'exposures';
             // set-up the callback
-            this.callbackOptions.first = true;
-            this.callbackOptions.interrupt = false;
+            this.callbackOptions.expected = undefined;
+            this.callbackOptions.last = 0;
 
             let storage = {};
             this.gridData = [];
@@ -205,7 +208,11 @@ export default {
         onConnected: function() {
             this.controller.getVersion()
                 .then(version => console.log(version))
-                .then(() => {this.connected = true});
+                .then(() => {this.connected = true})
+                .catch(error => {
+                    console.log("version error")
+                    console.log(error);
+                });
         },
         onDisconnected: function() {
             this.connected = false;

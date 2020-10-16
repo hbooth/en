@@ -51,7 +51,17 @@ export const COMMANDS = Object.freeze({
       returnType: Uint8Array
     },
     getMode: {
-      value: 'C',
+      value: 'm',
+      notify: true,
+      returnType: Uint8Array
+    },
+    setModeRaw: {
+      value: 'R',
+      notify: true,
+      returnType: Uint8Array
+    },
+    setModeEncounter: {
+      value: 'E',
       notify: true,
       returnType: Uint8Array
     },
