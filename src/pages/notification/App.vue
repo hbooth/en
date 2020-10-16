@@ -19,6 +19,21 @@
 </script>
 
 <style>
+body {
+  font-family: sans-serif;
+	font-size: 1.2rem;
+}
+
+button {
+		border: none;
+		padding: 0.25rem 1rem;
+		margin: 0 0.25rem;
+		border-radius: 10px;
+		text-decoration: none;
+		background: #800080;
+		color: #ffffff;
+}
+
 .round-button {
     display: inline-block;
     border-radius: 50%;

@@ -147,14 +147,14 @@ dl.status dd input {
 div.time dl {
   position: relative;
   display:inline-block;
-  width: 18em;
+  width: 20em;
   vertical-align: 0.75em;
   margin-top: 0;
   margin-bottom: 0;
 }
 
 div.time dl dt {
-  width: 3em;
+  width: 5em;
   vertical-align: middle;
   text-align: right;
   margin-inline-start: 0;
@@ -162,7 +162,7 @@ div.time dl dt {
 }
 
 div.time dl dd {
-  width: 13em;
+  width: 14em;
   text-align: left;
   margin-inline-end: 0;
 }
