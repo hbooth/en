@@ -74,6 +74,8 @@ function compare(local, exposures) {
 export default {
     components: { DeviceInfo, SimpleGrid, ProgressStatus},
     data() {
+        console.log(process.env.VUE_APP_DATA_SERVER_HOST)
+        console.log(process.env.VUE_APP_DATA_SERVER_PORT)
         return {
             controller: Controller(),
             connected: false,
@@ -133,7 +135,11 @@ export default {
                     });
                     progress.taskNextStep("Uploading...");
                     // send the data to the server
-                    return postEncounters('localhost', '8000', rows, 'POSITIVE',
+                    return postEncounters(
+                        process.env.VUE_APP_DATA_SERVER_HOST,
+                        process.env.VUE_APP_DATA_SERVER_PORT,
+                        rows,
+                        'POSITIVE',
                         { name: this.controller.getDeviceName() });
                 })
                 .then(result => {
@@ -176,7 +182,8 @@ export default {
                     progress.taskNextStep("Retrieving Server Data");
                     storage.local = local;
                     // then retrieve the data from the server
-                    return getEncounters('localhost', '8000');
+                    return getEncounters(process.env.VUE_APP_DATA_SERVER_HOST,
+                        process.env.VUE_APP_DATA_SERVER_PORT);
                 })
                 .then(data => {
                     progress.taskNextStep("Comparing");
