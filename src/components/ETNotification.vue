@@ -74,8 +74,6 @@ function compare(local, exposures) {
 export default {
     components: { DeviceInfo, SimpleGrid, ProgressStatus},
     data() {
-        console.log(process.env.VUE_APP_DATA_SERVER_HOST)
-        console.log(process.env.VUE_APP_DATA_SERVER_PORT)
         return {
             controller: Controller(),
             connected: false,
