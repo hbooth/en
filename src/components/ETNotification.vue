@@ -147,7 +147,7 @@ export default {
                     if (error instanceof InterruptException) {
                         progress.taskCancel("Upload Cancelled");
                     } else {
-                        progress.taskError("Error during Upload");
+                        progress.taskError("Error during Upload: " + error.message);
                         console.log(error);
                     }
                 })
@@ -193,7 +193,7 @@ export default {
                     if (error instanceof InterruptException) {
                         progress.taskCancel("Check Cancelled");
                     } else {
-                        progress.taskError("Error While Looking for Encounters");
+                        progress.taskError("Error While Looking for Encounters: " + error.message);
                         console.log(error);
                     }
                 })

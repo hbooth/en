@@ -43,8 +43,10 @@ async function postEncounters(host, port, rows, status = 'NONE', meta = {}, batc
             await http_promise;
             added = added + submission.encounters.length;
         } catch(error) {
+            // put into console, and rethrow
             console.log(`error while sending data: ${data}`);
             console.log(error);
+            throw error;
         }
     }
     return added;
@@ -95,7 +97,10 @@ function createHttpRequestPromise(options, data) {
 			});
         });
         request.on('error', error => {
-            reject(new Error(error));
+            if (error.message == 'Failed to fetch') {
+                error.message = 'Failed to fetch (Connection Error?)'
+            }
+            reject(error);
         });
         if (data) {
             request.write(data);
