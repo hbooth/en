@@ -1,20 +1,21 @@
 <template>
   <div class="device-info">
     <dl class="status">
-      <dt>Connected:</dt>
-      <dd><input :value="deviceName" readonly="true" />
-      <a href="#" class="round-button disconnect" v-on:click="onDisconnect">
-          <font-awesome-layers style="font-size: 1.5em;">
-            <font-awesome-icon :icon="['fas', 'ban']"/>
-            <font-awesome-icon :icon="['fab', 'bluetooth-b']" transform="shrink-6"/>
-          </font-awesome-layers>
-      </a>
-      </dd>
+      <dt class="name">Connected:</dt>
+      <dd class="name"><input v-model="deviceName" :readonly="allowNameChange ? false : 'readonly'" /></dd>
+      <dd class="name"><button v-bind:style="{ visibility: allowNameChange ? 'visible' : 'hidden' }" v-on:click="onSetName">Set Name</button></dd>
       <dt><font-awesome-icon :icon="batteryIcon" size="lg" />:</dt>
       <dd>{{batteryLevel}}%</dd>
       <dt>Mem:</dt>
       <dd>{{ memoryUsed * 32 }} bytes {{ memoryPercent | formatFloat(2) }}%</dd>
+      <dt><a href="#" class="round-button disconnect" v-on:click="onDisconnect">
+          <font-awesome-layers style="font-size: 1.5em;">
+            <font-awesome-icon :icon="['fas', 'ban']"/>
+            <font-awesome-icon :icon="['fab', 'bluetooth-b']" transform="shrink-6"/>
+          </font-awesome-layers>
+      </a></dt>
     </dl>
+    <p v-if="message" class="error">{{message}}</p>
     <div class="time">
       <font-awesome-layers style="font-size: 4em;">
         <font-awesome-icon :icon="['far', 'square']" />
@@ -47,9 +48,17 @@ export default {
     },
     connected: {
       type: Boolean
+    },
+    allowNameChange: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
+    var deviceName = "N/A";
+    if (this.connected && this.device) {
+      deviceName = this.device.getDeviceName();
+    }
     return {
       batteryLevel: undefined,
       memoryUsed: undefined,
@@ -57,6 +66,8 @@ export default {
       upTime: undefined,
       deviceTime: undefined,
       totalMemory: 32768,
+      deviceName,
+      message: undefined
     }
   },
   created() {
@@ -86,8 +97,17 @@ export default {
       }
     },
     onSynch: function() {
-      console.log('synch')
-      this.device.synchClock().then(() => console.log('finished synch'));
+      this.message = undefined;
+      this.device.synchClock()
+        .catch(error => this.message = error.message);
+    },
+    onSetName: function() {
+      this.device.setName('NIST' + ("0000" + this.deviceName).slice(-4) )
+        .then(() => {
+          alert("Please turn off or reboot device for the name change to take effect.");
+          this.device.disconnect()
+        })
+        .catch(error => this.message = error.message);
     }
   },
   computed: {
@@ -111,12 +131,6 @@ export default {
         return undefined;
       }
       return (this.memoryUsed / this.totalMemory) * 100
-    },
-    deviceName: function() {
-      if (this.connected && this.device) {
-        return this.device.getDeviceName()
-      }
-      return "N/A"
     }
   }
 }
@@ -140,8 +154,20 @@ dl dd {
   margin-inline-end: 0.5em;
 }
 
-dl.status dd input {
+dl.status {
+  width: 20em;
+}
+
+dl.status dt.name {
+  width: 6em;
+}
+
+dl.status dd.name input {
   width: 5em;
+}
+
+dl.status dd.name:not(:first-child) {
+  width: 6em;
 }
 
 div.time dl {
@@ -192,6 +218,11 @@ div.time button:active {
 a.disconnect {
   margin-left: 2px;
   vertical-align: middle;
+}
+
+p.error {
+  color: #FF0000;
+  font-weight: bold;
 }
 
 </style>

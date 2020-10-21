@@ -1,6 +1,6 @@
 <template>
 <div class="management-tab">
-<device-info :device="controller" :connected="connected" v-if="connected" allowSynch></device-info>
+<device-info :device="controller" :connected="connected" v-if="connected" allowSynch allowNameChange></device-info>
 <p v-if="connected">Firmware Version: {{ version }}</p>
 <progress-status v-if="connected" ref="progress"></progress-status>
 <button id="cancel" v-if="connected && fetch" v-on:click="onCancel">Cancel</button>
