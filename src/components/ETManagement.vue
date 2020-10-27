@@ -1,7 +1,18 @@
 <template>
 <div class="management-tab">
-<device-info :device="controller" :connected="connected" v-if="connected" allowSynch allowNameChange></device-info>
-<p v-if="connected">Firmware Version: {{ version }}</p>
+<device-info v-if="connected"
+    v-on:disconnect="controller.disconnect()"
+    :info="info"
+    :message="message"
+    v-on:synch-clock="onSynch"
+    v-on:set-name="onSetName"
+    allowSynch
+    allowNameChange></device-info>
+<simple-grid :data="gridData" :columns="gridColumns" :caption="'Device Information'" v-if="connected && gridData.length > 0"></simple-grid>
+<div v-if="connected">
+    <button v-on:click="onMode">Toggle Mode</button>
+    <button v-on:click="onEncounterId">Toggle Encounter Id</button>
+</div>
 <progress-status v-if="connected" ref="progress"></progress-status>
 <button id="cancel" v-if="connected && fetch" v-on:click="onCancel">Cancel</button>
 <div class="memory" v-if="connected">
@@ -18,7 +29,9 @@
 <script>
 import DeviceInfo from './DeviceInfo'
 import ProgressStatus from './ProgressStatus'
-import { Controller, InterruptException }  from '../modules/dongle-control'
+import { Controller, InterruptException, MODES}  from '../modules/dongle-control'
+import { DeviceWrapper } from '../modules/device-wrapper'
+import SimpleGrid from './SimpleGrid'
 
 function toHexString (byteArray) {
   const length = byteArray.length * 2;
@@ -52,21 +65,32 @@ function download(filecontent, filename) {
 }
 
 export default {
-    components: { DeviceInfo, ProgressStatus},
+    components: { DeviceInfo, SimpleGrid,  ProgressStatus},
     data() {
         return {
             controller: Controller(),
             connected: false,
+            info: undefined,
+            message: undefined,
             memory: undefined,
             fetch: false,
-            version: undefined,
+            gridColumns: [ {title:"Name", name: 'name'}, {title: "Value", name: 'value'}],
+            gridData: [],
+            status: undefined,
             callbackOptions: { expected: undefined, last: 0, interrupt: false, onProgress: this.onProgress}
         };
     },
     created() {
-        this.controller.on('connected', () => {
-            this.controller.getVersion()
-                .then(version => this.version = version)
+        this.controller.on('connected', this.onConnected);
+        this.controller.on('disconnected', this.onDisconnected);
+    },
+    beforeDestroy() {
+        this.controller.off('disconnected', this.onDisconnected)
+        this.controller.off('connected', this.onConnected)
+    },
+    methods: {
+        onConnected: function() {
+            this.onRefresh()
                 .then(() => {
                     this.connected = true
                     this.memory = undefined
@@ -75,20 +99,51 @@ export default {
                     console.log("version error")
                     console.log(error);
                 });
-        })
-        this.controller.on('disconnected', () => {
+        },
+        onRefresh: function() {
+            this.gridData = [];
+            return this.controller.getVersion()
+                .then(version => this.gridData.push({name: "Firmware Version", value: version}))
+                .then(() => new DeviceWrapper(this.controller))
+                .then(info => {
+                    this.info = info
+                    if (info) {
+                        this.gridData.push({name: "Mode", value: info.status.rawMode() ? "Calibration" : "Exposure"})
+                        this.gridData.push({name: "Save To Flash", value: info.status.saveToFlash()})
+                        this.gridData.push({name: "Mark", value: info.status.mark()})
+                        this.gridData.push({name: "Synchronized", value: !info.status.noSynch()})
+                        this.gridData.push({name: "Full Encounter Id", value: !info.status.nameInEncounterId()})
+                    }
+                })
+        },
+        onDisconnected: function() {
             this.connected = false
             this.memory = undefined
-            this.version = undefined
+            this.info = undefined
+            this.gridData = []
             this.fetch = false
-            this.$refs.progress.clear()
-        })
-    },
-    beforeDestroy() {
-        this.controller.off('disconnected')
-        this.controller.off('connected')
-    },
-    methods: {
+            if (this.$refs.progress) {
+                this.$refs.progress.clear()
+            }
+        },
+        onMode: function () {
+            if (this.info.status.rawMode()) {
+                this.controller.setMode(MODES.ENCOUNTER)
+            } else {
+                this.controller.setMode(MODES.CALIBRATION)
+            }
+            this.onRefresh()
+        },
+        onEncounterId: function () {
+            if (this.info.status.nameInEncounterId()) {
+                console.log('setting full');
+                this.controller.setFullEncounterId()
+            } else {
+                console.log('using name');
+                this.controller.setNameInEncounterId()
+            }
+            this.onRefresh()
+        },
         fetchData: function() {
             // set-up the callback
             this.callbackOptions.expected = undefined;
@@ -149,6 +204,19 @@ export default {
                     console.log(error);
                 }
             })
+        },
+        onSynch: function() {
+            this.message = undefined;
+            this.controller.synchClock()
+                .catch(error => this.message = error.message);
+        },
+        onSetName: function(name) {
+            this.controller.setName('NIST' + ("0000" + name).slice(-4) )
+                .then(() => {
+                    alert("Please turn off or reboot device for the name change to take effect.");
+                    this.controller.disconnect()
+                })
+                .catch(error => this.message = error.message);
         },
         onProgress: function(received, expected) {
             if (!this.callbackOptions.expected) {

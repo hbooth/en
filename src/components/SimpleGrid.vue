@@ -4,7 +4,7 @@
     <thead>
         <tr>
         <th v-for="(header, index) in headers"
-            @click="sortBy(key)"
+            @click="sortBy(header.name)"
             :class="{ active: sortKey == header.name }"
             :key="index">
             {{ header.title | capitalize }}

@@ -88,5 +88,13 @@ export const COMMANDS = Object.freeze({
     markLastAddress: {
       value: 'Y',
       returnType: Uint8Array
+    },
+    setNameInEncounterId: {
+      value: 'd',
+      returnType: Uint8Array
+    },
+    setFullEncounterId: {
+      value: 'D',
+      returnType: Uint8Array
     }
 })

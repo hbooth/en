@@ -1,8 +1,8 @@
 <template >
 <div class="calibration-tab">
-<device-info :device="controller" :connected="connected" v-if="connected"></device-info>
-<!-- p id="mode" v-if="connected" v-bind:style="{color: modeColor}">Mode: {{ modeText }}</p -->
-<button id="init" v-if="connected" :on="onInit">init</button>
+<device-info v-on:disconnect="controller.disconnect()" :info="deviceInfo" :message="message" v-if="connected"></device-info>
+<button id="init" v-if="connected" v-on:click="onInit">init</button>
+<p id="mode" v-if="connected" v-bind:style="{color: modeColor}">Mode: {{ modeText }}</p>
 
 <fieldset id="calibration-scenario" v-if="connected">
     <legend>Calibration Scenario</legend>
@@ -41,6 +41,7 @@
 <script>
 import DeviceInfo from './DeviceInfo'
 import { Controller, MODES}  from '../modules/dongle-control'
+import { DeviceWrapper } from '../modules/device-wrapper'
 
 export default {
     components: { DeviceInfo},
@@ -51,7 +52,8 @@ export default {
             distance: 1,
             orientation: 'baseline',
             recording: false,
-//            mode: undefined
+            deviceInfo: undefined,
+            message: undefined
         };
     },
     computed: {
@@ -83,16 +85,16 @@ export default {
             }
         },
         modeText: function() {
-            if (this.mode === MODES.CALIBRATION) {
+            if (this.deviceInfo && this.deviceInfo.status.rawMode()) {
                 return "Calibration";
-            } else if (this.mode === MODES.ENCOUNTER) {
+            } else if (this.deviceInfo) {
                 return "Encounter"
             } else {
                 return "???"
             }
         },
         modeColor: function() {
-            if (this.mode === MODES.CALIBRATION) {
+            if (this.deviceInfo && this.deviceInfo.status.rawMode()) {
                 return "inherit";
             } else {
                 return "red";
@@ -119,8 +121,8 @@ export default {
         onConnected: function() {
             this.controller.getVersion()
                 .then(version => console.log(version))
-//                .then(() => this.controller.getMode())
-//                .then(mode => this.mode = mode)
+                .then(() => new DeviceWrapper(this.controller))
+                .then(info => this.deviceInfo = info)
                 .then(() => {this.connected = true});
         },
         onDisconnected: function() {
@@ -144,7 +146,8 @@ export default {
             this.controller.synchClock()
                 .then(() => this.controller.eraseData())
                 .then(() => this.controller.setMode(MODES.CALIBRATION))
-                .then(() => this.controller.getMode())
+                .then(() => new DeviceWrapper(this.controller))
+                .then(info => this.deviceInfo = info)
         }
     }
 }

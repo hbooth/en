@@ -113,11 +113,27 @@ export function Controller() {
 
   function getCountStatus() {
     assertConnection();
+    // _status
+    // bit 0: set when save to flash
+    // bit 1: set when mark
+    // bit 2: set when no clock
+    // bit 3: CAL/RAW mode
+    // bit 4: set when name in encounterID
     return connection.gatt.getPrimaryService(SERVICE_UUID)
       .then(service => service.getCharacteristic(CHARACTERISTICS.count))
       .then(characteristic => characteristic.readValue())
       .then(value => {
-        return { blocks: value.getUint16(0, true), status: value.getUint8(3)}
+        var status = value.getUint8(3);
+        console.log(status)
+        return { blocks: value.getUint16(0, true),
+          saveToFlash: () => (status & 0x01) == 1,
+          mark: () => (status & 0x02) == 2,
+          noSynch: () => {
+            return (status & 0x04) == 4;
+          },
+          rawMode: () => (status & 0x08) == 8,
+          nameInEncounterId: () => (status & 0x10) == 16
+        }
       });
   }
 
@@ -386,6 +402,8 @@ export function Controller() {
     setMark: () => writeCommand(COMMANDS.recordPrimaryEncounterEvent.value),
     setUnmark: () => writeCommand(COMMANDS.recordSecondaryEncounterEvent.value),
     setMode: (mode) => writeCommand(mode.command),
+    setNameInEncounterId: () => writeCommand(COMMANDS.setNameInEncounterId.value),
+    setFullEncounterId: () => writeCommand(COMMANDS.setFullEncounterId.value),
     getMode,
     writeCalibration,
     setScanParameters,

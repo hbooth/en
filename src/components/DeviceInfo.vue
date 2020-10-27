@@ -2,13 +2,13 @@
   <div class="device-info">
     <dl class="status">
       <dt class="name">Connected:</dt>
-      <dd class="name"><input v-model="deviceName" :readonly="allowNameChange ? false : 'readonly'" /></dd>
-      <dd class="name"><button v-bind:style="{ visibility: allowNameChange ? 'visible' : 'hidden' }" v-on:click="onSetName">Set Name</button></dd>
+      <dd class="name"><input v-model="name" :readonly="allowNameChange ? false : 'readonly'" /></dd>
+      <dd class="name"><button v-bind:style="{ visibility: allowNameChange ? 'visible' : 'hidden' }" v-on:click="$emit('set-name', name)">Set Name</button></dd>
       <dt><font-awesome-icon :icon="batteryIcon" size="lg" />:</dt>
-      <dd>{{batteryLevel}}%</dd>
+      <dd>{{info.batteryLevel}}%</dd>
       <dt>Mem:</dt>
-      <dd>{{ memoryUsed * 32 }} bytes {{ memoryPercent | formatFloat(2) }}%</dd>
-      <dt><a href="#" class="round-button disconnect" v-on:click="onDisconnect">
+      <dd>{{ info.memoryUsed * 32 }} bytes {{ memoryPercent | formatFloat(2) }}%</dd>
+      <dt><a href="#" class="round-button disconnect" v-on:click="$emit('disconnect')">
           <font-awesome-layers style="font-size: 1.5em;">
             <font-awesome-icon :icon="['fas', 'ban']"/>
             <font-awesome-icon :icon="['fab', 'bluetooth-b']" transform="shrink-6"/>
@@ -23,31 +23,31 @@
       </font-awesome-layers>
       <dl>
         <dt>Uptime:</dt>
-        <dd>{{ upTime | formatUptime }}</dd>
+        <dd>{{ info.upTime | formatUptime }}</dd>
         <dt>Device:</dt>
-        <dd>{{ deviceTime | formatMoment }}</dd>
+        <dd>{{ info.deviceTime | formatMoment }}</dd>
         <dt>Local:</dt>
-        <dd>{{ localTime | formatMoment }}</dd>
+        <dd>{{ info.localTime | formatMoment }}</dd>
       </dl>
-      <button class="synch" v-if="allowSynch" v-on:click="onSynch">Synch Clock</button>
+      <button class="synch" v-if="allowSynch" v-on:click="$emit('synch-clock')">Synch Clock</button>
     </div>
   </div>
 </template>
 
 <script>
-import dayjs from 'dayjs'
-
 export default {
   props: {
     allowSynch: {
       type: Boolean,
       default: false
     },
-    device: {
-      type: Object
+    info: {
+      type: Object,
+      required: true
     },
-    connected: {
-      type: Boolean
+    message: {
+      type: String,
+      default: undefined
     },
     allowNameChange: {
       type: Boolean,
@@ -55,82 +55,31 @@ export default {
     }
   },
   data() {
-    var deviceName = "N/A";
-    if (this.connected && this.device) {
-      deviceName = this.device.getDeviceName();
-    }
     return {
-      batteryLevel: undefined,
-      memoryUsed: undefined,
-      localTime: dayjs(),
-      upTime: undefined,
-      deviceTime: undefined,
-      totalMemory: 32768,
-      deviceName,
-      message: undefined
-    }
-  },
-  created() {
-    if (this.device) {
-      this.device.getCountStatus()
-        .then(value => {
-          this.memoryUsed = value.blocks;
-          return value.status;
-        })
-        .then(status => {
-          if ((status & 0x4) == 4) {
-            return this.device.synchClock();
-          }
-        })
-        .then(() => this.device.getUptime())
-        .then(value => this.upTime = value)
-        .then(() => this.device.getSynchTime())
-        .then(value => this.deviceTime = dayjs(value + this.upTime))
-        .then(() => this.device.getBatteryLevel())
-        .then(value => this.batteryLevel = value)
-    }
-  },
-  methods: {
-    onDisconnect: function() {
-      if (this.device) {
-        this.device.disconnect();
-      }
-    },
-    onSynch: function() {
-      this.message = undefined;
-      this.device.synchClock()
-        .catch(error => this.message = error.message);
-    },
-    onSetName: function() {
-      this.device.setName('NIST' + ("0000" + this.deviceName).slice(-4) )
-        .then(() => {
-          alert("Please turn off or reboot device for the name change to take effect.");
-          this.device.disconnect()
-        })
-        .catch(error => this.message = error.message);
+      name: this.info.deviceName
     }
   },
   computed: {
     batteryIcon: function() {
-      if (this.batteryLevel == undefined) {
+      if (this.info.batteryLevel == undefined) {
         return ['fas', 'ban']
-      } else if (this.batteryLevel > 87.5) {
+      } else if (this.info.batteryLevel > 87.5) {
         return ['fas', 'battery-full']
-      } else if (this.batteryLevel > 62.5){
+      } else if (this.info.batteryLevel > 62.5){
         return ['fas', 'battery-three-quarters']
-      } else if (this.batteryLevel > 37.5) {
+      } else if (this.info.batteryLevel > 37.5) {
         return ['fas', 'battery-half']
-      } else if (this.batteryLevel > 15) {
+      } else if (this.info.batteryLevel > 15) {
         return ['fas', 'battery-quarter']
       } else {
         return ['fas', 'battery-empty']
       }
     },
     memoryPercent: function() {
-      if (this.memoryUsed === undefined) {
+      if (this.info.memoryUsed === undefined) {
         return undefined;
       }
-      return (this.memoryUsed / this.totalMemory) * 100
+      return (this.info.memoryUsed / this.info.totalMemory) * 100
     }
   }
 }
@@ -155,19 +104,19 @@ dl dd {
 }
 
 dl.status {
-  width: 20em;
+  width: 25em;
 }
 
 dl.status dt.name {
-  width: 6em;
+  width: 7em;
 }
 
 dl.status dd.name input {
-  width: 5em;
+  width: 6em;
 }
 
 dl.status dd.name:not(:first-child) {
-  width: 6em;
+  width: 8em;
 }
 
 div.time dl {

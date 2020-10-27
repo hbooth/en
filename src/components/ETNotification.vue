@@ -1,6 +1,6 @@
 <template >
 <div class="notification-tab">
-<device-info :device="controller" :connected="connected" v-if="connected"></device-info>
+<device-info v-on:disconnect="controller.disconnect()" :info="deviceInfo" v-if="connected"></device-info>
 <div v-if="connected">
     <progress-status ref="progress"></progress-status>
     <button v-if="state !== 'default'" v-on:click="onCancel">Cancel</button>
@@ -17,6 +17,7 @@ import DeviceInfo from './DeviceInfo'
 import SimpleGrid from './SimpleGrid'
 import ProgressStatus from './ProgressStatus'
 import { Controller, InterruptException }  from '../modules/dongle-control'
+import { DeviceWrapper } from '../modules/device-wrapper'
 import { bytesToData } from '../modules/bytes-to-csv'
 import { postEncounters, getEncounters } from '../modules/encounter-server'
 
@@ -76,6 +77,7 @@ export default {
     data() {
         return {
             controller: Controller(),
+            deviceInfo: undefined,
             connected: false,
             gridColumns: [ {title:"Start Time", name: 'start', filter: 'formatMoment'},
                 {title: "Duration (minutes)", name: 'duration'},
@@ -213,9 +215,10 @@ export default {
         onConnected: function() {
             this.controller.getVersion()
                 .then(version => console.log(version))
+                .then(() => new DeviceWrapper(this.controller))
+                .then(info => this.deviceInfo = info)
                 .then(() => {this.connected = true})
                 .catch(error => {
-                    console.log("version error")
                     console.log(error);
                 });
         },

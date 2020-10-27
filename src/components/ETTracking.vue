@@ -1,6 +1,6 @@
 <template >
 <div class="tracking-tab">
-<device-info :device="controller" :connected="connected" v-if="connected"></device-info>
+<device-info v-on:disconnect="controller.disconnect()" :info="deviceInfo" :message="message" v-if="connected"></device-info>
 <div class="control" v-if="connected">
     <a href="#" class="round-button" v-on:click="onRecordingButton">
         <font-awesome-layers style="font-size: 2em;">
@@ -21,47 +21,69 @@
 <script>
 import DeviceInfo from './DeviceInfo'
 import { Controller }  from '../modules/dongle-control'
+import { DeviceWrapper } from '../modules/device-wrapper'
 
 export default {
     components: { DeviceInfo },
     data() {
         return {
             controller: Controller(),
+            deviceInfo: undefined,
+            message: undefined,
             recording: false,
             near: false,
             connected: false,
         };
     },
     created() {
-        this.controller.on('connected', () => {
-            this.connected = true
-        })
-        this.controller.on('disconnected', () => {
-            this.connected = false
-        })
+        this.controller.on('connected', this.onConnected);
+        this.controller.on('disconnected', this.onDisconnected);
     },
     beforeDestroy() {
-        this.controller.off('disconnected')
-        this.controller.off('connected')
+        this.controller.off('disconnected', this.onDisconnected)
+        this.controller.off('connected', this.onConnected)
     },
     methods: {
         onRecordingButton: function() {
             if (!this.recording) {
+                this.message = undefined;
                 this.controller.setScanParameters(320 * 12, 230)
                     .then(() => this.controller.startRecording())
                     .then(() => {
                         this.recording = true;
                         this.near = false;
+                    })
+                    .catch(error => {
+                        console.log(error);
+                        this.message = error.message;
                     });
             } else {
                 this.controller.stopRecording().then(() => {
                     this.recording = false;
+                })
+                .catch(error => {
+                        console.log(error);
+                        this.message = error.message;
                 });
             }
         },
         onConnect: function() {
             this.controller.connect()
-        }
+        },
+        onConnected: function() {
+            this.controller.getVersion()
+                .then(version => console.log(version))
+                .then(() => new DeviceWrapper(this.controller))
+                .then(info => this.deviceInfo = info)
+                .then(() => {this.connected = true})
+                .catch(error => {
+                    console.log(error);
+                    this.message = error.message;
+                });
+        },
+        onDisconnected: function() {
+            this.connected = false;
+        },
     },
     computed: {
         recordingText: function() {
