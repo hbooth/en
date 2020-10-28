@@ -124,7 +124,6 @@ export function Controller() {
       .then(characteristic => characteristic.readValue())
       .then(value => {
         var status = value.getUint8(3);
-        console.log(status)
         return { blocks: value.getUint16(0, true),
           saveToFlash: () => (status & 0x01) == 1,
           mark: () => (status & 0x02) == 2,

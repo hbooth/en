@@ -14,9 +14,11 @@ export function DeviceWrapper(device) {
     memoryUsed = value.blocks;
     if (value.noSynch()) {
       console.log("synchronizing")
-      return device.synchClock();
+      return device.synchClock()
+        .then(() => device.getCountStatus())
+        .then(value => status = value);
     }
-    status = value;
+    return status = value;
   })
   .then(() => device.getUptime())
   .then(value => upTime = value)

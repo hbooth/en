@@ -77,6 +77,7 @@ export default {
             gridColumns: [ {title:"Name", name: 'name'}, {title: "Value", name: 'value'}],
             gridData: [],
             status: undefined,
+            busy: false,
             callbackOptions: { expected: undefined, last: 0, interrupt: false, onProgress: this.onProgress}
         };
     },
@@ -95,12 +96,13 @@ export default {
                     this.connected = true
                     this.memory = undefined
                 })
-                .catch(error => {
-                    console.log("version error")
-                    console.log(error);
-                });
         },
         onRefresh: function() {
+            if (this.busy) {
+                return;
+            }
+            this.message = undefined;
+            this.busy = true;
             this.gridData = [];
             return this.controller.getVersion()
                 .then(version => this.gridData.push({name: "Firmware Version", value: version}))
@@ -114,7 +116,13 @@ export default {
                         this.gridData.push({name: "Synchronized", value: !info.status.noSynch()})
                         this.gridData.push({name: "Full Encounter Id", value: !info.status.nameInEncounterId()})
                     }
+                    
                 })
+                .catch(error => {
+                    console.log(error);
+                    this.message = error.message;
+                })
+                .then(() => this.busy = false)
         },
         onDisconnected: function() {
             this.connected = false
@@ -127,6 +135,9 @@ export default {
             }
         },
         onMode: function () {
+            if (this.busy) {
+                return;
+            }
             if (this.info.status.rawMode()) {
                 this.controller.setMode(MODES.ENCOUNTER)
             } else {
@@ -135,16 +146,21 @@ export default {
             this.onRefresh()
         },
         onEncounterId: function () {
+            if (this.busy) {
+                return;
+            }
             if (this.info.status.nameInEncounterId()) {
-                console.log('setting full');
                 this.controller.setFullEncounterId()
             } else {
-                console.log('using name');
                 this.controller.setNameInEncounterId()
             }
             this.onRefresh()
         },
         fetchData: function() {
+            if (this.busy) {
+                return;
+            }
+            this.busy = true;
             // set-up the callback
             this.callbackOptions.expected = undefined;
             this.callbackOptions.last = 0;
@@ -167,24 +183,25 @@ export default {
                 })
                 .then((result) => {
                     this.fetch = false;
+                    this.busy = false;
                     this.$refs.progress.taskReset();
                     return result;
                 });
         },
         onLoad: function() {
-            if (!this.fetch) {
+            if (!this.busy) {
                 this.fetchData().then(data => {
                     this.memory = data
                 });
             }
         },
         onErase: function() {
-            if (!this.fetch) {
+            if (!this.busy) {
                 this.controller.eraseData().then(() => this.memory = undefined)
             }
         },
         onDownload: function() {
-            if (this.fetch) return;
+            if (this.busy) return;
             if (!this.memory) {
                 this.fetchData()
                     .then(data => {
